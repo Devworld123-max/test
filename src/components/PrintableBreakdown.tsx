@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Printer, Copy } from 'lucide-react';
+import { X, Printer, Download } from 'lucide-react';
 import { Project, SalaryCalculation, ReimbursementItem } from '../types/project';
 import { getOrdinalSuffix } from '../utils/dateUtils';
 
@@ -28,61 +28,396 @@ const PrintableBreakdown: React.FC<PrintableBreakdownProps> = ({
   rates
 }) => {
   const handlePrint = () => {
-    window.print();
+    // Hide the modal backdrop and buttons before printing
+    const modal = document.querySelector('[data-print-modal]') as HTMLElement;
+    const backdrop = document.querySelector('[data-print-backdrop]') as HTMLElement;
+    const actionButtons = document.querySelector('[data-print-actions]') as HTMLElement;
+    
+    if (modal && backdrop && actionButtons) {
+      backdrop.style.display = 'none';
+      actionButtons.style.display = 'none';
+      modal.style.position = 'static';
+      modal.style.margin = '0';
+      modal.style.maxWidth = 'none';
+      modal.style.boxShadow = 'none';
+      
+      // Add print styles
+      const printStyles = document.createElement('style');
+      printStyles.innerHTML = `
+        @media print {
+          body * { visibility: hidden; }
+          [data-print-modal], [data-print-modal] * { visibility: visible; }
+          [data-print-modal] { 
+            position: static !important;
+            margin: 0 !important;
+            padding: 20px !important;
+            box-shadow: none !important;
+            border-radius: 0 !important;
+          }
+          .no-print { display: none !important; }
+          .print-break { page-break-after: always; }
+          table { page-break-inside: avoid; }
+          .bg-gradient-to-br, .bg-gradient-to-r { 
+            background: #f3f4f6 !important; 
+            -webkit-print-color-adjust: exact;
+            color-adjust: exact;
+          }
+          .text-red-600, .text-red-700 { color: #dc2626 !important; }
+          .text-emerald-600, .text-emerald-700 { color: #059669 !important; }
+          .text-purple-600, .text-purple-700 { color: #7c3aed !important; }
+          .border-red-200, .border-red-500 { border-color: #fecaca !important; }
+          .border-emerald-200 { border-color: #a7f3d0 !important; }
+        }
+      `;
+      document.head.appendChild(printStyles);
+      
+      window.print();
+      
+      // Restore original styles after printing
+      setTimeout(() => {
+        backdrop.style.display = '';
+        actionButtons.style.display = '';
+        modal.style.position = '';
+        modal.style.margin = '';
+        modal.style.maxWidth = '';
+        modal.style.boxShadow = '';
+        document.head.removeChild(printStyles);
+      }, 1000);
+    }
   };
 
-  const handleCopyText = () => {
-    // Generate text version of the breakdown
-    let textContent = 'ROOCHE DIGITAL REPRESENTATIVE SALARY BREAKDOWN\n';
-    textContent += `Generated on: ${new Date().toLocaleDateString()}\n\n`;
+  const handleSaveToDevice = () => {
+    // Generate HTML content for saving
+    const htmlContent = generateHTMLContent();
     
-    textContent += 'RATE INFORMATION\n';
-    textContent += `${monthInfo.monthName} has ${monthInfo.workingDays} working days\n`;
-    textContent += `First Project: ₱20,000/month | ₱${rates.firstProjectDailyRate.toFixed(2)}/day | ₱${rates.firstProjectHourlyRate.toFixed(2)}/hour\n`;
-    textContent += `2nd & Succeeding: ₱10,000/month | ₱${rates.secondProjectDailyRate.toFixed(2)}/day | ₱${rates.secondProjectHourlyRate.toFixed(2)}/hour\n\n`;
-    
-    if (projects.length > 0) {
-      textContent += 'PROJECT DETAILS\n';
-      let totalSalary = 0;
-      
-      projects.forEach((project, index) => {
-        const calc = calculations[index];
-        const projectNumber = index + 1;
-        const suffix = getOrdinalSuffix(projectNumber);
-        
-        totalSalary += calc.totalSalary;
-        
-        textContent += `\n${projectNumber}${suffix} Project: ${project.name}\n`;
-        textContent += `Period: ${new Date(project.startDate).toLocaleDateString()} - ${new Date(project.endDate).toLocaleDateString()}\n`;
-        textContent += `Working Days: ${calc.workingDays} days (${calc.workingHours} hours)\n`;
-        textContent += `Hourly Rate: ₱${calc.hourlyRate.toFixed(2)}/hour\n`;
-        textContent += `Regular Pay: ₱${calc.regularPay.toFixed(2)}\n`;
-        if (calc.otHours > 0) {
-          textContent += `Overtime Hours: ${calc.otHours} hours\n`;
-          textContent += `Overtime Pay: ₱${calc.otPay.toFixed(2)}\n`;
+    // Create blob and download
+    const blob = new Blob([htmlContent], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Rooche_Digital_Salary_Breakdown_${new Date().toISOString().split('T')[0]}.html`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const generateHTMLContent = () => {
+    const totalSalary = calculations.reduce((sum, calc) => sum + calc.totalSalary, 0);
+    const totalReimbursements = reimbursements.reduce((sum, item) => sum + item.amount, 0);
+    const grandTotal = totalSalary + totalReimbursements;
+
+    return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rooche Digital Salary Breakdown</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f9fafb;
         }
-        textContent += `Total: ₱${calc.totalSalary.toFixed(2)}\n`;
-      });
-      
-      const totalReimbursements = reimbursements.reduce((sum, item) => sum + item.amount, 0);
-      
-      if (reimbursements.length > 0) {
-        textContent += '\nREIMBURSEMENTS\n';
-        reimbursements.forEach(item => {
-          textContent += `${item.description} (${item.category}): ₱${item.amount.toFixed(2)} - ${new Date(item.date).toLocaleDateString()}\n`;
-        });
-        textContent += `Total Reimbursements: ₱${totalReimbursements.toFixed(2)}\n`;
-      }
-      
-      textContent += `\nSUMMARY\n`;
-      textContent += `Total Salary: ₱${totalSalary.toFixed(2)}\n`;
-      textContent += `Total Reimbursements: ₱${totalReimbursements.toFixed(2)}\n`;
-      textContent += `\nGRAND TOTAL: ₱${(totalSalary + totalReimbursements).toFixed(2)}\n`;
-    }
-    
-    navigator.clipboard.writeText(textContent).then(() => {
-      alert('Breakdown copied to clipboard!');
-    });
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding: 30px;
+            background: linear-gradient(135deg, #fee2e2, #fecaca);
+            border-radius: 15px;
+            border: 2px solid #fca5a5;
+        }
+        .header h1 {
+            color: #dc2626;
+            font-size: 2.5rem;
+            margin: 0 0 10px 0;
+            font-weight: bold;
+        }
+        .header h2 {
+            color: #374151;
+            font-size: 2rem;
+            margin: 0 0 20px 0;
+        }
+        .header p {
+            color: #6b7280;
+            font-size: 1.1rem;
+            margin: 0;
+        }
+        .section {
+            background: white;
+            margin: 30px 0;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            border: 1px solid #e5e7eb;
+        }
+        .section h3 {
+            color: #dc2626;
+            font-size: 1.5rem;
+            margin: 0 0 20px 0;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #fca5a5;
+        }
+        .rate-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .rate-card {
+            background: #f9fafb;
+            padding: 20px;
+            border-radius: 10px;
+            border: 1px solid #e5e7eb;
+        }
+        .rate-card h4 {
+            color: #dc2626;
+            margin: 0 0 15px 0;
+            font-size: 1.2rem;
+        }
+        .rate-card p {
+            margin: 5px 0;
+            color: #6b7280;
+        }
+        .rate-card .highlight {
+            color: #dc2626;
+            font-weight: bold;
+        }
+        .project-card {
+            background: #f9fafb;
+            padding: 25px;
+            margin: 20px 0;
+            border-radius: 10px;
+            border-left: 4px solid #dc2626;
+        }
+        .project-card h4 {
+            color: #dc2626;
+            font-size: 1.3rem;
+            margin: 0 0 15px 0;
+        }
+        .project-details {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 15px 0;
+        }
+        .project-details div {
+            background: white;
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid #e5e7eb;
+        }
+        .project-details .label {
+            font-weight: 600;
+            color: #374151;
+            display: block;
+            margin-bottom: 5px;
+        }
+        .project-details .value {
+            color: #6b7280;
+        }
+        .project-total {
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 2px solid #e5e7eb;
+            text-align: right;
+        }
+        .project-total .amount {
+            font-size: 1.3rem;
+            font-weight: bold;
+            color: #dc2626;
+        }
+        .reimbursement-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 0;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        .reimbursement-item:last-child {
+            border-bottom: none;
+        }
+        .reimbursement-details h5 {
+            margin: 0 0 5px 0;
+            color: #374151;
+            font-weight: 600;
+        }
+        .reimbursement-details .meta {
+            color: #6b7280;
+            font-size: 0.9rem;
+        }
+        .reimbursement-amount {
+            font-weight: bold;
+            color: #059669;
+            font-size: 1.1rem;
+        }
+        .grand-total {
+            background: linear-gradient(135deg, #7c3aed, #8b5cf6);
+            color: white;
+            padding: 30px;
+            border-radius: 15px;
+            text-align: center;
+            margin: 40px 0;
+        }
+        .grand-total h3 {
+            font-size: 2rem;
+            margin: 0 0 20px 0;
+            color: white;
+        }
+        .grand-total-details {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 15px 0;
+            font-size: 1.2rem;
+        }
+        .grand-total-final {
+            border-top: 2px solid rgba(255, 255, 255, 0.3);
+            padding-top: 20px;
+            margin-top: 20px;
+        }
+        .grand-total-final .amount {
+            font-size: 2.5rem;
+            font-weight: bold;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 40px;
+            padding: 20px;
+            color: #6b7280;
+            border-top: 2px solid #e5e7eb;
+        }
+        .footer p {
+            margin: 5px 0;
+        }
+        @media print {
+            body { background: white; }
+            .section { box-shadow: none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Rooche Digital Representative</h1>
+        <h2>Salary Breakdown</h2>
+        <p>Generated on: ${new Date().toLocaleDateString()}</p>
+    </div>
+
+    <div class="section">
+        <h3>Monthly Rate Information</h3>
+        <p><strong>${monthInfo.monthName}</strong> has <strong>${monthInfo.workingDays} working days</strong></p>
+        <div class="rate-grid">
+            <div class="rate-card">
+                <h4>1st Project Rate</h4>
+                <p>Monthly: <span class="highlight">₱20,000</span></p>
+                <p>Daily: <span class="highlight">₱${rates.firstProjectDailyRate.toFixed(2)}</span></p>
+                <p>Hourly: <span class="highlight">₱${rates.firstProjectHourlyRate.toFixed(2)}</span></p>
+            </div>
+            <div class="rate-card">
+                <h4>2nd+ Project Rate</h4>
+                <p>Monthly: <span class="highlight">₱10,000</span></p>
+                <p>Daily: <span class="highlight">₱${rates.secondProjectDailyRate.toFixed(2)}</span></p>
+                <p>Hourly: <span class="highlight">₱${rates.secondProjectHourlyRate.toFixed(2)}</span></p>
+            </div>
+        </div>
+    </div>
+
+    ${projects.length > 0 ? `
+    <div class="section">
+        <h3>Project Details</h3>
+        ${projects.map((project, index) => {
+          const calc = calculations[index];
+          const projectNumber = index + 1;
+          const suffix = getOrdinalSuffix(projectNumber);
+          
+          return `
+            <div class="project-card">
+                <h4>${projectNumber}${suffix} Project: ${project.name}</h4>
+                <div class="project-details">
+                    <div>
+                        <span class="label">Period:</span>
+                        <span class="value">${new Date(project.startDate).toLocaleDateString()} - ${new Date(project.endDate).toLocaleDateString()}</span>
+                    </div>
+                    <div>
+                        <span class="label">Working Days:</span>
+                        <span class="value">${calc.workingDays} days (${calc.workingHours} hours)</span>
+                    </div>
+                    <div>
+                        <span class="label">Hourly Rate:</span>
+                        <span class="value">₱${calc.hourlyRate.toFixed(2)}/hour</span>
+                    </div>
+                    <div>
+                        <span class="label">Regular Pay:</span>
+                        <span class="value">₱${calc.regularPay.toFixed(2)}</span>
+                    </div>
+                    ${calc.otHours > 0 ? `
+                    <div>
+                        <span class="label">OT Hours:</span>
+                        <span class="value">${calc.otHours} hours</span>
+                    </div>
+                    <div>
+                        <span class="label">OT Pay:</span>
+                        <span class="value">₱${calc.otPay.toFixed(2)}</span>
+                    </div>
+                    ` : ''}
+                </div>
+                <div class="project-total">
+                    <span class="amount">Project Total: ₱${calc.totalSalary.toFixed(2)}</span>
+                </div>
+            </div>
+          `;
+        }).join('')}
+    </div>
+    ` : ''}
+
+    ${reimbursements.length > 0 ? `
+    <div class="section">
+        <h3>Reimbursements</h3>
+        ${reimbursements.map(item => `
+            <div class="reimbursement-item">
+                <div class="reimbursement-details">
+                    <h5>${item.description}</h5>
+                    <div class="meta">${item.category} • ${new Date(item.date).toLocaleDateString()}</div>
+                </div>
+                <div class="reimbursement-amount">₱${item.amount.toFixed(2)}</div>
+            </div>
+        `).join('')}
+        <div class="project-total">
+            <span class="amount">Total Reimbursements: ₱${totalReimbursements.toFixed(2)}</span>
+        </div>
+    </div>
+    ` : ''}
+
+    <div class="grand-total">
+        <h3>GRAND TOTAL</h3>
+        <div class="grand-total-details">
+            <span>Salary:</span>
+            <span>₱${totalSalary.toFixed(2)}</span>
+        </div>
+        <div class="grand-total-details">
+            <span>Reimbursements:</span>
+            <span>₱${totalReimbursements.toFixed(2)}</span>
+        </div>
+        <div class="grand-total-final">
+            <div class="grand-total-details">
+                <span>TOTAL:</span>
+                <span class="amount">₱${grandTotal.toFixed(2)}</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="footer">
+        <p><strong>Rooche Digital - Salary Calculator</strong></p>
+        <p>Document generated on ${new Date().toLocaleString()}</p>
+    </div>
+</body>
+</html>
+    `;
   };
 
   if (!isOpen) return null;
@@ -92,9 +427,9 @@ const PrintableBreakdown: React.FC<PrintableBreakdownProps> = ({
   const grandTotal = totalSalary + totalReimbursements;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm z-50 overflow-auto">
-      <div className="bg-white m-4 md:m-8 p-6 md:p-8 rounded-2xl max-w-4xl mx-auto shadow-2xl">
-        <div className="flex justify-between items-center mb-8">
+    <div className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm z-50 overflow-auto" data-print-backdrop>
+      <div className="bg-white m-4 md:m-8 p-6 md:p-8 rounded-2xl max-w-4xl mx-auto shadow-2xl" data-print-modal>
+        <div className="flex justify-between items-center mb-8 no-print" data-print-actions>
           <h2 className="text-2xl font-bold text-red-600">Printable Breakdown</h2>
           <button
             onClick={onClose}
@@ -243,7 +578,7 @@ const PrintableBreakdown: React.FC<PrintableBreakdownProps> = ({
         </div>
 
         {/* Action Buttons */}
-        <div className="flex justify-center gap-4 mt-8 pt-6 border-t border-gray-200">
+        <div className="flex justify-center gap-4 mt-8 pt-6 border-t border-gray-200 no-print" data-print-actions>
           <button
             onClick={handlePrint}
             className="bg-gray-700 text-white px-6 py-3 rounded-lg font-medium transition-all duration-200 hover:bg-gray-800 hover:-translate-y-1 hover:shadow-lg flex items-center gap-2"
@@ -252,11 +587,11 @@ const PrintableBreakdown: React.FC<PrintableBreakdownProps> = ({
             Print
           </button>
           <button
-            onClick={handleCopyText}
+            onClick={handleSaveToDevice}
             className="bg-blue-600 text-white px-6 py-3 rounded-lg font-medium transition-all duration-200 hover:bg-blue-700 hover:-translate-y-1 hover:shadow-lg flex items-center gap-2"
           >
-            <Copy className="w-4 h-4" />
-            Copy Text
+            <Download className="w-4 h-4" />
+            Save to Device
           </button>
         </div>
       </div>
