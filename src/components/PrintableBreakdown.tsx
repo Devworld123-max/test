@@ -1,7 +1,16 @@
 import React from 'react';
-import { X, Printer, Download } from 'lucide-react';
+import { X, Printer, Download, FileText } from 'lucide-react';
 import { Project, SalaryCalculation, ReimbursementItem } from '../types/project';
 import { getOrdinalSuffix } from '../utils/dateUtils';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
+
+// Extend jsPDF type to include autoTable
+declare module 'jspdf' {
+  interface jsPDF {
+    autoTable: (options: any) => jsPDF;
+  }
+}
 
 interface PrintableBreakdownProps {
   isOpen: boolean;
@@ -100,6 +109,207 @@ const PrintableBreakdown: React.FC<PrintableBreakdownProps> = ({
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
+  };
+
+  const handleGeneratePDF = () => {
+    const doc = new jsPDF();
+    const totalSalary = calculations.reduce((sum, calc) => sum + calc.totalSalary, 0);
+    const totalReimbursements = reimbursements.reduce((sum, item) => sum + item.amount, 0);
+    const grandTotal = totalSalary + totalReimbursements;
+
+    // Set up colors
+    const primaryColor = [220, 38, 38]; // Red-600
+    const secondaryColor = [107, 114, 128]; // Gray-500
+    const accentColor = [124, 58, 237]; // Purple-600
+
+    // Header
+    doc.setFillColor(...primaryColor);
+    doc.rect(0, 0, 210, 40, 'F');
+    
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(24);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Rooche Digital Representative', 105, 20, { align: 'center' });
+    
+    doc.setFontSize(18);
+    doc.setFont('helvetica', 'normal');
+    doc.text('Salary Breakdown', 105, 30, { align: 'center' });
+
+    // Reset text color
+    doc.setTextColor(0, 0, 0);
+    
+    // Generation date
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 20, 50);
+
+    let yPosition = 65;
+
+    // Monthly Rate Information
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...primaryColor);
+    doc.text('Monthly Rate Information', 20, yPosition);
+    yPosition += 10;
+
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...secondaryColor);
+    doc.text(`${monthInfo.monthName} has ${monthInfo.workingDays} working days`, 20, yPosition);
+    yPosition += 15;
+
+    // Rate table
+    const rateData = [
+      ['Project Type', 'Monthly Rate', 'Daily Rate', 'Hourly Rate'],
+      ['1st Project', '₱20,000', `₱${rates.firstProjectDailyRate.toFixed(2)}`, `₱${rates.firstProjectHourlyRate.toFixed(2)}`],
+      ['2nd+ Projects', '₱10,000', `₱${rates.secondProjectDailyRate.toFixed(2)}`, `₱${rates.secondProjectHourlyRate.toFixed(2)}`]
+    ];
+
+    doc.autoTable({
+      startY: yPosition,
+      head: [rateData[0]],
+      body: rateData.slice(1),
+      theme: 'grid',
+      headStyles: { fillColor: primaryColor, textColor: [255, 255, 255], fontStyle: 'bold' },
+      bodyStyles: { textColor: [0, 0, 0] },
+      alternateRowStyles: { fillColor: [249, 250, 251] },
+      margin: { left: 20, right: 20 }
+    });
+
+    yPosition = (doc as any).lastAutoTable.finalY + 20;
+
+    // Projects section
+    if (projects.length > 0) {
+      doc.setFontSize(16);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(...primaryColor);
+      doc.text('Project Details', 20, yPosition);
+      yPosition += 15;
+
+      projects.forEach((project, index) => {
+        const calc = calculations[index];
+        const projectNumber = index + 1;
+        const suffix = getOrdinalSuffix(projectNumber);
+
+        // Check if we need a new page
+        if (yPosition > 250) {
+          doc.addPage();
+          yPosition = 20;
+        }
+
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(...primaryColor);
+        doc.text(`${projectNumber}${suffix} Project: ${project.name}`, 20, yPosition);
+        yPosition += 10;
+
+        const projectData = [
+          ['Period', `${new Date(project.startDate).toLocaleDateString()} - ${new Date(project.endDate).toLocaleDateString()}`],
+          ['Working Days', `${calc.workingDays} days (${calc.workingHours} hours)`],
+          ['Hourly Rate', `₱${calc.hourlyRate.toFixed(2)}/hour`],
+          ['Regular Pay', `₱${calc.regularPay.toFixed(2)}`]
+        ];
+
+        if (calc.otHours > 0) {
+          projectData.push(['OT Hours', `${calc.otHours} hours`]);
+          projectData.push(['OT Pay', `₱${calc.otPay.toFixed(2)}`]);
+        }
+
+        projectData.push(['Project Total', `₱${calc.totalSalary.toFixed(2)}`]);
+
+        doc.autoTable({
+          startY: yPosition,
+          body: projectData,
+          theme: 'plain',
+          bodyStyles: { textColor: [0, 0, 0] },
+          columnStyles: {
+            0: { fontStyle: 'bold', cellWidth: 40 },
+            1: { cellWidth: 80 }
+          },
+          margin: { left: 25, right: 20 }
+        });
+
+        yPosition = (doc as any).lastAutoTable.finalY + 15;
+      });
+    }
+
+    // Reimbursements section
+    if (reimbursements.length > 0) {
+      // Check if we need a new page
+      if (yPosition > 200) {
+        doc.addPage();
+        yPosition = 20;
+      }
+
+      doc.setFontSize(16);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(...primaryColor);
+      doc.text('Reimbursements', 20, yPosition);
+      yPosition += 15;
+
+      const reimbursementData = reimbursements.map(item => [
+        item.description,
+        item.category,
+        new Date(item.date).toLocaleDateString(),
+        `₱${item.amount.toFixed(2)}`
+      ]);
+
+      reimbursementData.push(['', '', 'Total Reimbursements:', `₱${totalReimbursements.toFixed(2)}`]);
+
+      doc.autoTable({
+        startY: yPosition,
+        head: [['Description', 'Category', 'Date', 'Amount']],
+        body: reimbursementData,
+        theme: 'grid',
+        headStyles: { fillColor: [5, 150, 105], textColor: [255, 255, 255], fontStyle: 'bold' }, // Emerald-600
+        bodyStyles: { textColor: [0, 0, 0] },
+        alternateRowStyles: { fillColor: [236, 253, 245] }, // Emerald-50
+        footStyles: { fillColor: [5, 150, 105], textColor: [255, 255, 255], fontStyle: 'bold' },
+        margin: { left: 20, right: 20 }
+      });
+
+      yPosition = (doc as any).lastAutoTable.finalY + 20;
+    }
+
+    // Grand Total section
+    // Check if we need a new page
+    if (yPosition > 220) {
+      doc.addPage();
+      yPosition = 20;
+    }
+
+    // Grand total background
+    doc.setFillColor(...accentColor);
+    doc.rect(20, yPosition - 5, 170, 40, 'F');
+
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(18);
+    doc.setFont('helvetica', 'bold');
+    doc.text('GRAND TOTAL', 105, yPosition + 8, { align: 'center' });
+
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Salary: ₱${totalSalary.toFixed(2)}`, 30, yPosition + 18);
+    doc.text(`Reimbursements: ₱${totalReimbursements.toFixed(2)}`, 30, yPosition + 25);
+
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`TOTAL: ₱${grandTotal.toFixed(2)}`, 105, yPosition + 35, { align: 'center' });
+
+    // Footer
+    const pageCount = doc.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.setTextColor(...secondaryColor);
+      doc.text('Rooche Digital - Salary Calculator', 105, 285, { align: 'center' });
+      doc.text(`Document generated on ${new Date().toLocaleString()}`, 105, 290, { align: 'center' });
+      doc.text(`Page ${i} of ${pageCount}`, 190, 290, { align: 'right' });
+    }
+
+    // Save the PDF
+    const fileName = `Rooche_Digital_Salary_Breakdown_${new Date().toISOString().split('T')[0]}.pdf`;
+    doc.save(fileName);
   };
 
   const generateHTMLContent = () => {
@@ -430,7 +640,7 @@ const PrintableBreakdown: React.FC<PrintableBreakdownProps> = ({
     <div className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm z-50 overflow-auto" data-print-backdrop>
       <div className="bg-white m-4 md:m-8 p-6 md:p-8 rounded-2xl max-w-4xl mx-auto shadow-2xl" data-print-modal>
         <div className="flex justify-between items-center mb-8 no-print" data-print-actions>
-          <h2 className="text-2xl font-bold text-red-600">Printable Breakdown</h2>
+          <h2 className="text-2xl font-bold text-red-600">Export Options</h2>
           <button
             onClick={onClose}
             className="p-2 bg-red-100 text-red-600 rounded-full hover:bg-red-200 transition-colors duration-200"
@@ -578,20 +788,27 @@ const PrintableBreakdown: React.FC<PrintableBreakdownProps> = ({
         </div>
 
         {/* Action Buttons */}
-        <div className="flex justify-center gap-4 mt-8 pt-6 border-t border-gray-200 no-print" data-print-actions>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-8 pt-6 border-t border-gray-200 no-print" data-print-actions>
           <button
             onClick={handlePrint}
-            className="bg-gray-700 text-white px-6 py-3 rounded-lg font-medium transition-all duration-200 hover:bg-gray-800 hover:-translate-y-1 hover:shadow-lg flex items-center gap-2"
+            className="bg-gray-700 text-white px-6 py-4 rounded-lg font-medium transition-all duration-200 hover:bg-gray-800 hover:-translate-y-1 hover:shadow-lg flex items-center justify-center gap-2"
           >
-            <Printer className="w-4 h-4" />
-            Print
+            <Printer className="w-5 h-5" />
+            Print Document
+          </button>
+          <button
+            onClick={handleGeneratePDF}
+            className="bg-red-600 text-white px-6 py-4 rounded-lg font-medium transition-all duration-200 hover:bg-red-700 hover:-translate-y-1 hover:shadow-lg flex items-center justify-center gap-2"
+          >
+            <FileText className="w-5 h-5" />
+            Generate PDF
           </button>
           <button
             onClick={handleSaveToDevice}
-            className="bg-blue-600 text-white px-6 py-3 rounded-lg font-medium transition-all duration-200 hover:bg-blue-700 hover:-translate-y-1 hover:shadow-lg flex items-center gap-2"
+            className="bg-blue-600 text-white px-6 py-4 rounded-lg font-medium transition-all duration-200 hover:bg-blue-700 hover:-translate-y-1 hover:shadow-lg flex items-center justify-center gap-2"
           >
-            <Download className="w-4 h-4" />
-            Save to Device
+            <Download className="w-5 h-5" />
+            Save HTML
           </button>
         </div>
       </div>
