@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 export const getOrdinalSuffix = (number: number): string => {
   const j = number % 10;
   const k = number % 100;
@@ -24,7 +25,7 @@ export const calculateWorkingDaysInMonth = (year: number, month: number): number
 
 export const calculateWorkingDays = (startDate: string, endDate: string): number => {
   let count = 0;
-  let currentDate = new Date(startDate);
+  const currentDate = new Date(startDate);
   const end = new Date(endDate);
 
   while (currentDate <= end) {
@@ -52,5 +53,14 @@ export const getCurrentMonthInfo = () => {
   const monthName = now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
   const workingDays = calculateWorkingDaysInMonth(year, month);
   
+  return { year, month, monthName, workingDays };
+};
+
+export const getMonthInfoForDate = (date: Date) => {
+  const year = date.getFullYear();
+  const month = date.getMonth();
+  const monthName = date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  const workingDays = calculateWorkingDaysInMonth(year, month);
+
   return { year, month, monthName, workingDays };
 };

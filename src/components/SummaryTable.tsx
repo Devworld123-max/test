@@ -9,7 +9,9 @@ interface SummaryTableProps {
 }
 
 const SummaryTable: React.FC<SummaryTableProps> = ({ projects, calculations, totalReimbursements }) => {
-  if (projects.length === 0) {
+  // Only show table if there are active (non-disbanded) projects
+  const activeProjects = projects.filter(p => !p.disbanded);
+  if (activeProjects.length === 0) {
     return null;
   }
 
@@ -44,8 +46,13 @@ const SummaryTable: React.FC<SummaryTableProps> = ({ projects, calculations, tot
           </tr>
         </thead>
         <tbody>
-          {projects.map((project, index) => {
-            const calc = calculations[index];
+          {calculations.map((calc, index) => {
+            // Find the corresponding active project for this calculation
+            const activeProjects = projects.filter(p => !p.disbanded);
+            const project = activeProjects[index];
+            
+            if (!project) return null;
+            
             const projectNumber = index + 1;
             const suffix = getOrdinalSuffix(projectNumber);
             const monthlyRate = index === 0 ? 20000 : 10000;

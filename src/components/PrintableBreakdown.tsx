@@ -109,8 +109,8 @@ const PrintableBreakdown: React.FC<PrintableBreakdownProps> = ({
 
   return (
     <div className="overflow-auto fixed inset-0 z-50 bg-black bg-opacity-50 backdrop-blur-sm">
-      <div className="p-6 m-4 mx-auto max-w-4xl bg-white rounded-2xl shadow-2xl md:m-8 md:p-8">
-        <div className="flex justify-between items-center mb-8">
+      <div className="p-6 m-4 mx-auto max-w-4xl bg-white rounded-2xl shadow-2xl print-modal md:m-8 md:p-8">
+        <div className="flex justify-between items-center mb-8 no-print">
           <h2 className="text-2xl font-bold text-red-600">Printable Breakdown</h2>
           <button
             onClick={onClose}
@@ -120,7 +120,7 @@ const PrintableBreakdown: React.FC<PrintableBreakdownProps> = ({
           </button>
         </div>
 
-        <div className="space-y-8">
+        <div className="space-y-6 print-optimize">
           {/* Header */}
           <div className="text-center">
             <h1 className="mb-2 text-3xl font-bold text-red-600">Rooche Digital Representative</h1>
@@ -129,7 +129,7 @@ const PrintableBreakdown: React.FC<PrintableBreakdownProps> = ({
           </div>
 
           {/* Rate Information */}
-          <div className="p-6 bg-gradient-to-br from-red-50 to-red-100 rounded-xl border border-red-200">
+          <div className="p-6 bg-gradient-to-br from-red-50 to-red-100 rounded-xl border border-red-200 print-no-break print-bg">
             <h3 className="mb-4 text-xl font-semibold text-red-700">Monthly Rate Information</h3>
             <p className="mb-4 text-lg">
               <strong>{monthInfo.monthName}</strong> has <strong className="text-red-600">{monthInfo.workingDays} working days</strong>
@@ -157,7 +157,7 @@ const PrintableBreakdown: React.FC<PrintableBreakdownProps> = ({
                   const suffix = getOrdinalSuffix(projectNumber);
                   
                   return (
-                    <div key={project.id} className="p-6 bg-gray-50 rounded-xl border-l-4 border-red-500">
+                    <div key={project.id} className="p-6 bg-gray-50 rounded-xl border-l-4 border-red-500 print-no-break">
                       <h4 className="mb-3 text-lg font-semibold text-red-600">
                         {projectNumber}{suffix} Project: {project.name}
                       </h4>
@@ -207,7 +207,7 @@ const PrintableBreakdown: React.FC<PrintableBreakdownProps> = ({
           {reimbursements.length > 0 && (
             <div>
               <h3 className="mb-4 text-xl font-semibold text-gray-800">Reimbursements</h3>
-              <div className="p-6 bg-emerald-50 rounded-xl border border-emerald-200">
+              <div className="p-6 bg-emerald-50 rounded-xl border border-emerald-200 print-no-break print-bg">
                 <div className="space-y-2">
                   {reimbursements.map(item => (
                     <div key={item.id} className="flex justify-between items-center py-2 border-b border-emerald-200 last:border-b-0">
@@ -231,7 +231,7 @@ const PrintableBreakdown: React.FC<PrintableBreakdownProps> = ({
           )}
 
           {/* Grand Total */}
-          <div className="p-8 text-center text-white bg-gradient-to-r from-purple-600 to-purple-700 rounded-xl">
+          <div className="p-8 text-center text-white bg-gradient-to-r from-purple-600 to-purple-700 rounded-xl print-no-break print-bg">
             <h3 className="mb-4 text-2xl font-bold">GRAND TOTAL</h3>
             <div className="space-y-2 text-lg">
               <div className="flex justify-between items-center">
@@ -259,7 +259,7 @@ const PrintableBreakdown: React.FC<PrintableBreakdownProps> = ({
         </div>
 
         {/* Action Buttons */}
-        <div className="flex gap-4 justify-center pt-6 mt-8 border-t border-gray-200">
+        <div className="flex gap-4 justify-center pt-6 mt-8 border-t border-gray-200 no-print">
           <button
             onClick={handlePrint}
             className="flex gap-2 items-center px-6 py-3 font-medium text-white bg-gray-700 rounded-lg transition-all duration-200 hover:bg-gray-800 hover:-translate-y-1 hover:shadow-lg"

@@ -17,7 +17,9 @@ const SalaryTable: React.FC<SalaryTableProps> = ({
   totalOTPay,
   totalSalary
 }) => {
-  if (projects.length === 0) {
+  // Only show table if there are active (non-disbanded) projects
+  const activeProjects = projects.filter(p => !p.disbanded);
+  if (activeProjects.length === 0) {
     return null;
   }
 
@@ -40,9 +42,14 @@ const SalaryTable: React.FC<SalaryTableProps> = ({
           </tr>
         </thead>
         <tbody>
-          {projects.map((project, index) => {
-            const calc = calculations[index];
-            const projectNumber = index + 1;
+          {calculations.map((calc, index) => {
+            // Find the corresponding active project for this calculation
+            const activeProjects = projects.filter(p => !p.disbanded);
+            const project = activeProjects[index];
+            
+            if (!project) return null;
+            
+            const projectNumber = project.position;
             const suffix = getOrdinalSuffix(projectNumber);
             
             return (
@@ -54,7 +61,10 @@ const SalaryTable: React.FC<SalaryTableProps> = ({
                 `}
               >
                 <td className="px-4 py-4 font-medium text-gray-800">
-                  {project.name} <span className="text-red-600">({projectNumber}{suffix} Project)</span>
+                  {project.name} 
+                  <span className="text-red-600">
+                    ({projectNumber}{suffix} Project - {project.position === 1 ? '₱20,000 Rate' : '₱10,000 Rate'})
+                  </span>
                 </td>
                 <td className="px-4 py-4 text-gray-600">{new Date(project.startDate).toLocaleDateString()}</td>
                 <td className="px-4 py-4 text-gray-600">{new Date(project.endDate).toLocaleDateString()}</td>

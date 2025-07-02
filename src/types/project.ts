@@ -3,6 +3,8 @@ export interface Project {
   name: string;
   startDate: string;
   endDate: string;
+  position: number; // Original creation order (1st, 2nd, 3rd, etc.)
+  disbanded: boolean; // Whether the project has been disbanded
 }
 
 export interface ReimbursementItem {
